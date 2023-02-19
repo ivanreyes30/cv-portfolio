@@ -1,0 +1,15 @@
+version: '3.9'
+
+services:
+  api:
+    container_name: cv-api
+    build:
+      context: .
+      dockerfile: ./docker/api/Dockerfile
+      target: development
+    volumes:
+      - ./api:/app
+      - /app/node_modules
+    ports:
+      - 4000:4000
+    command: npm run dev
