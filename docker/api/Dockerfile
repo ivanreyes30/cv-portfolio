@@ -9,6 +9,8 @@ RUN npm install
 
 COPY ./api .
 
+RUN chmod +x ./start.sh
+
 # Development build stage
 FROM common-build-stage as development-build-stage
 

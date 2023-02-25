@@ -24,6 +24,7 @@ services:
       - ./api:/app
       # - /app/node_modules
     restart: 'unless-stopped'
+    command: sh -c "./start.sh && npm run dev"
     networks:
       - backend
 
