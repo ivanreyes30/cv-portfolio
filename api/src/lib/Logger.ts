@@ -13,7 +13,12 @@ class Logger implements LoggerInterface
 
     private logger: WinstonLogger
 
-    public initializeLogger (): void
+    constructor ()
+    {
+        this.initializeLogger()
+    }
+
+    private initializeLogger (): void
     {
         this.logger = createLogger({
             format: format.json(),
@@ -24,9 +29,9 @@ class Logger implements LoggerInterface
         })
     }
 
-    public errorlogs (message: string): void
+    public errorlogs (error: any): void
     {
-       this.logger.error(message) 
+        this.logger.error(error)
     }
 }
 

@@ -1,5 +1,5 @@
 export default interface ExceptionHandlerInterface {
     status: boolean,
-    message: string,
+    message: any,
     code: number
 }

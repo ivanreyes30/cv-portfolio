@@ -4,6 +4,7 @@ import { NODE_ENV, PORT } from '@/config'
 import AuthRoute from '@/routes/AuthRoute'
 import Passport from '@/lib/Passport'
 import Logger from '@/lib/Logger'
+import ErrorMiddleware from '@/middlewares/ErrorMiddleware'
 
 class App 
 {
@@ -23,14 +24,20 @@ class App
 		this.port = PORT || 4000
 		this.env = NODE_ENV || 'development'
 
+        // Initialize Methods
+        // this.initializeLogger()
+        this.initializeBodyParser()
+        this.initializeRoutesAndControllers()
+		this.initializePassport()
+        this.initializeErrorHandling()
+    }
+
+
+    private initializeBodyParser ()
+    {
         // Codes for Body Parser. I put this because the json body parameter is undefined without these codes
         this.app.use(express.json())
         this.app.use(express.urlencoded({ extended: false }))
-
-        // Initialize Methods
-        this.initializeRoutesAndControllers()
-		this.initializePassport()
-        this.initializeLogger()
     }
 
     private initializeRoutesAndControllers (): void
@@ -45,9 +52,9 @@ class App
         this.passport.initializePassport()
     }
 
-    private initializeLogger (): void
+    private initializeErrorHandling (): void
     {
-        this.logger.initializeLogger()
+        this.app.use(ErrorMiddleware)
     }
 
     public listen (): void
