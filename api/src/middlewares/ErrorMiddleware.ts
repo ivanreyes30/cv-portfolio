@@ -10,7 +10,7 @@ const errorMiddleware = (error: HttpException, request: Request, response: Respo
     
         logger.errorlogs(`[${request.method}] ${request.path} >> StatusCode:: ${status}, Message:: ${JSON.stringify(message)}`)
         
-        response.status(status).json({ status: error.status, error: message })
+        response.status(status).json({ status: false, message })
     } catch (error) {
         next(error)
     }

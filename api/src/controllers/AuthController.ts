@@ -1,24 +1,34 @@
 import { Request, Response, NextFunction } from 'express'
-import axios from 'axios'
+import AuthService from '@/services/AuthService'
 // import { hash } from 'bcrypt'
 
 class AuthController 
 {
-    public login (request: Request, response: Response, next: NextFunction)
+    protected service = new AuthService()
+
+    public async login (request: Request, response: Response, next: NextFunction)
     {
-        axios.post('http://localhost:3000/auth/token', { email_address: 'test@test.com', password: 'test' }).then((result) => {
-            console.log(result)
-        }).catch((error) => {
-            console.log(error)
-        })
+        try {
+            const auth = await this.service.login(request)
+            // console.log(auth)
+        } catch (error) {
+            next(error)
+        }
+        // console.log(auth)
         // hash(request.body.password, 10, (err, hash) => {
         //     console.log(hash, 'asd')
         // })
     }
 
-    public token (request: Request, response: Response, next: NextFunction)
+    public async token (request: Request, response: Response, next: NextFunction)
     {
-        console.log('token')
+        try {
+            const token = await this.service.token(request)
+            response.status(200).json(token)
+        } catch (error) {
+            next(error)
+        }
+        // response.status(200).json({ status: true, message: 'hello world' })
     }
 }
 

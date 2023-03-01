@@ -2,7 +2,7 @@ import passport from 'passport'
 import Crypt from '@/lib/Crypt'
 import { sign } from 'jsonwebtoken'
 import { Request } from 'express'
-// import { DateTime } from 'luxon'
+import { DateTime } from 'luxon'
 import { Options, User, Token } from '@/types/PassportTypes'
 import { Strategy, ExtractJwt, VerifiedCallback } from 'passport-jwt'
 import { ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET } from '@/config'
@@ -35,7 +35,6 @@ class Passport implements PassportInterface
 				return done(null, false)
 			}))
 		})
-		this.generateToken()
     }
 
     public generateAccessToken (data: User): string
@@ -59,22 +58,23 @@ class Passport implements PassportInterface
 		return refreshToken
     }
 
-	public generateToken (): string
+	public generateToken (auth: any): Token
 	{
-		const user = {
-			name: 'Ivan',
-			user_id: 1,
-			role_id: 1,
-			date_issued_token: '2022-02-19 13:28:00'
-		}
+		// const user = {
+		// 	name: 'Ivan',
+		// 	user_id: 1,
+		// 	role_id: 1,
+		// 	date_issued_token: '2022-02-19 13:28:00'
+		// }
+		auth.date_issued_token = DateTime.now().toFormat('yyyy-LL-qq TT')
 		
 		this.token = {
-			access_token: this.generateAccessToken(user),
-			refresh_token: this.generateRefreshToken(user),
+			access_token: this.generateAccessToken(auth),
+			refresh_token: this.generateRefreshToken(auth),
 			expires_in: ACCESS_TOKEN_EXPIRES
 		}
 
-		return JSON.stringify(this.token)
+		return this.token
 	}
 }
 

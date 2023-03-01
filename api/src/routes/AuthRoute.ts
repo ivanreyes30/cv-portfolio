@@ -1,16 +1,20 @@
 import { Router, Request, Response } from 'express'
+import { AUTH_ROUTE } from '@/config/endpoints'
 // import { Router, Request, Response, NextFunction } from 'express'
 import RouteInterface from '@/interfaces/RouteInterface'
 import AuthController from '@/controllers/AuthController'
 import LoginRequest from '@/requests/auth/LoginRequest'
+import TokenRequest from '@/requests/auth/TokenRequest'
 // import AuthMiddleware from '@/middlewares/AuthMiddleware'
 // import passport from 'passport'
 
 class AuthRoute implements RouteInterface
 {
-    public path: string = '/auth'
+    public path: string = AUTH_ROUTE.baseUrl
+
     public router: Router = Router()
-    private authController = new AuthController()
+
+    private authController: AuthController = new AuthController()
 
     constructor ()
     {
@@ -19,8 +23,13 @@ class AuthRoute implements RouteInterface
 
     private initializeRoutes (): void
     {
-        this.router.post('/login', LoginRequest, this.authController.login.bind(this.authController))
-        this.router.post('/token', LoginRequest, this.authController.token.bind(this.authController))
+        const { 
+            login,
+            token
+        } = AUTH_ROUTE
+
+        this.router.post(login, LoginRequest, this.authController.login.bind(this.authController))
+        this.router.post(token, TokenRequest, this.authController.token.bind(this.authController))
         // passport.authenticate('jwt', { session: false })
         // this.router.get(
         //     '/test',

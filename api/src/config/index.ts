@@ -5,5 +5,6 @@ export const {
     REFRESH_TOKEN_SECRET,
     ENCRYPTION_ALGORITHM,
     SALT_KEY,
-    PASSWORD_KEY
+    PASSWORD_KEY,
+    APP_URL
 } = process.env

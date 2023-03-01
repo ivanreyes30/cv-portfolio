@@ -1,19 +1,16 @@
-import ExceptionHandlerInterface from '@/interfaces/ExceptionHandlerInterface'
+import HttpExceptionInterface from '@/interfaces/HttpExceptionInterface'
 
-class HttpException extends Error implements ExceptionHandlerInterface
+class HttpException extends Error implements HttpExceptionInterface
 {
-    public status: boolean
+    public code: number
 
     public message: any
 
-    public code: number
-
-    constructor (status: boolean, message: any, code: number)
+    constructor (code: number, message: any)
     {
         super(message)
-        this.status = status
-        this.message = message
         this.code = code
+        this.message = message
     }
 }
 

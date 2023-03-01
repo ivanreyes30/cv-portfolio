@@ -2,9 +2,10 @@ import Joi from 'joi'
 import HttpException from '@/core/HttpException'
 import { Request, Response, NextFunction } from 'express'
 
-const LoginRequest = (request: Request, response: Response, next: NextFunction) => {
+const TokenRequest = (request: Request, response: Response, next: NextFunction) => {
     const rules = Joi.object({
-        email_address: Joi.string().email().required(),
+        grant_type: Joi.string().valid('password', 'client_credentials').required(),
+        username: Joi.string().email().required(),
         password: Joi.string()
     })
 
@@ -15,4 +16,4 @@ const LoginRequest = (request: Request, response: Response, next: NextFunction) 
     throw new HttpException(422, error?.details)
 }
 
-export default LoginRequest
+export default TokenRequest
