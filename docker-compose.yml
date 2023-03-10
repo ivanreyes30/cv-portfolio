@@ -24,35 +24,51 @@ services:
       - ./api:/app
       # - /app/node_modules
     restart: 'unless-stopped'
+    depends_on:
+      - database
+      - cache
     command: sh -c "./start.sh && npm run dev"
     networks:
-      - backend
+      - cv-backend
 
   database:
     container_name: database
     image: mysql:8.0.32
     restart: unless-stopped
     # restart: always
-    depends_on: 
-      - db
+    # depends_on: 
+    #   - db
     volumes:
       - cv-data:/var/lib/mysql
     ports:
       - 3306:3306
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
       # MYSQL_USER: mysql
       # MYSQL_PASSWORD: root
       # MYSQL_DATABASE: cv
     networks:
-      - backend
+      - cv-backend
+      
+  cache:
+    container_name: redis-cache
+    image: redis:7.0.9-alpine3.17
+    restart: unless-stopped
+    volumes:
+      - cv-cache:/data
+    ports:
+      - '6379:6379'
+    command: redis-server --requirepass "${REDIS_PASSWORD}"
+    networks:
+      - cv-backend
+
 
 networks:
-  backend:
+  cv-backend:
     driver: bridge
 
 volumes:
+  cv-cache:
+    driver: local
   cv-data:
     driver: local
-  # data:
-  #   driver: local

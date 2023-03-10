@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import HttpException from '@/core/HttpException'
 import Logger from '@/lib/Logger'
 

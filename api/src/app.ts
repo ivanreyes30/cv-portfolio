@@ -1,6 +1,6 @@
 import express, { Application } from 'express'
 import { NODE_ENV, PORT } from '@/config'
-
+import cookieParser from 'cookie-parser'
 import AuthRoute from '@/routes/AuthRoute'
 import Passport from '@/lib/Passport'
 import Logger from '@/lib/Logger'
@@ -26,14 +26,21 @@ class App
 
         // Initialize Methods
         // this.initializeLogger()
+        this.initializeCookieParser()
         this.initializeBodyParser()
         this.initializeRoutesAndControllers()
 		this.initializePassport()
         this.initializeErrorHandling()
     }
 
+    private initializeCookieParser(): void
+    {
+        // Codes for Cookie Parser. I put this because the cookie headers is undefined without this
+        this.app.use(cookieParser())
+    }
 
-    private initializeBodyParser ()
+
+    private initializeBodyParser (): void
     {
         // Codes for Body Parser. I put this because the json body parameter is undefined without these codes
         this.app.use(express.json())

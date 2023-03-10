@@ -1,12 +1,12 @@
-import { Router, Request, Response } from 'express'
+import { Router } from 'express'
 import { AUTH_ROUTE } from '@/config/endpoints'
-// import { Router, Request, Response, NextFunction } from 'express'
 import RouteInterface from '@/interfaces/RouteInterface'
 import AuthController from '@/controllers/AuthController'
 import LoginRequest from '@/requests/auth/LoginRequest'
 import TokenRequest from '@/requests/auth/TokenRequest'
-// import AuthMiddleware from '@/middlewares/AuthMiddleware'
-// import passport from 'passport'
+import RefreshTokenRequest from '@/requests/auth/RefreshTokenRequest'
+import PasswordGrantMiddleware from '@/middlewares/PasswordGrantMiddleware'
+import RefreshTokenMiddleware from '@/middlewares/RefreshTokenMiddleware'
 
 class AuthRoute implements RouteInterface
 {
@@ -25,22 +25,14 @@ class AuthRoute implements RouteInterface
     {
         const { 
             login,
-            token
+            token,
+            refreshToken
         } = AUTH_ROUTE
 
+        this.router.get('/', [PasswordGrantMiddleware], this.authController.index.bind(this.authController))
         this.router.post(login, LoginRequest, this.authController.login.bind(this.authController))
         this.router.post(token, TokenRequest, this.authController.token.bind(this.authController))
-        // passport.authenticate('jwt', { session: false })
-        // this.router.get(
-        //     '/test',
-        //     passport.authenticate('jwt', { session: false }, (error, token) => {
-        //         console.log(token)
-        //     })
-        // )
-
-        // this.router.get('/test2', (req, res ) => {
-        //     console.log('test2')
-        // })
+        this.router.post(refreshToken, [RefreshTokenMiddleware, RefreshTokenRequest], this.authController.refreshToken.bind(this.authController))
     }
 }
 
