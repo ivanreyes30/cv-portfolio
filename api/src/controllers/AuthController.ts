@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
-import { Token, EncryptedToken } from '@/interfaces/AuthInterface'
+import { EncryptedToken } from '@/interfaces/AuthInterface'
 import Controller from '@/controllers/Controller'
 import AuthService from '@/services/AuthService'
 
@@ -29,8 +29,8 @@ class AuthController extends Controller
     public async token (request: Request, response: Response, next: NextFunction): Promise<void>
     {
         try {
-            const token: Token = await this.service.token(request)
-            this.responseHandler(request, response, 200, token)
+            const { encrypted_token, token }: EncryptedToken = await this.service.token(request)
+            this.responseHandlerWithCookie(request, response, 200, token, encrypted_token)
         } catch (error) {
             next(error)
         }
@@ -39,8 +39,8 @@ class AuthController extends Controller
     public async refreshToken (request: Request, response: Response, next: NextFunction): Promise<void>
     {
         try {
-            const token: Token = await this.service.refreshToken(request)
-            this.responseHandler(request, response, 200, token)
+            const { encrypted_token, token }: EncryptedToken = await this.service.refreshToken(request)
+            this.responseHandlerWithCookie(request, response, 200, token, encrypted_token)
         } catch (error) {
             next(error)
         }

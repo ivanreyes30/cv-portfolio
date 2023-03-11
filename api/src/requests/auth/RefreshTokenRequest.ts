@@ -5,6 +5,7 @@ import { Request, Response, NextFunction } from 'express'
 const RefreshTokenRequest = (request: Request, response: Response, next: NextFunction) => {
 
     const rules = Joi.object({
+        grant_type: Joi.string().valid('password', 'client_credentials').required(),
         refresh_token: Joi.string().required()
     })
 

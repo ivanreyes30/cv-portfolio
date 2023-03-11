@@ -1,20 +1,16 @@
-export interface EncryptedToken {
-    encrypted_token: string,
-    token: {
-        access_token: string,
-        refresh_token: string,
-        expires_in: number
-    }
-}
-
 export interface Token {
     access_token: string,
     refresh_token: string|undefined,
     expires_in: number
 }
 
+export interface EncryptedToken {
+    encrypted_token: string,
+    token: Token
+}
+
 export type User = {
-    user_id: number,
+    user_id: number|string,
     name: string,
     grant_type: string,
     email_address: string,

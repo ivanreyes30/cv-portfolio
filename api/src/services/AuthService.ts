@@ -41,65 +41,75 @@ class AuthService
         }
     }
 
-    public async token (request: Request): Promise<Token>
+    public async token (request: Request): Promise<EncryptedToken>
     {
-        const {
-            grant_type,
-            username,
-            password
-        } = request.body
+        const { grant_type } = request.body
 
-        // let auth = null
+        let token: Token|undefined
 
-        // switch (grant_type) {
-        //     case 'password': {
-        //         const validated = await this.repository.validateUser(username, password)
+        switch (grant_type) {
+            case 'password': {
+                const { username, password } = request.body
+                const validated = await this.repository.validateUser(username, password)
 
-        //         if (!validated) throw new HttpException(401, 'Invalid Account.')
+                if (!validated) throw new HttpException(401, 'Invalid Account.')
 
-        //         auth = validated
-        //         auth.grant_type = grant_type
-        //         auth.access_token_expires = DateTime.now().plus({ seconds: ACCESS_TOKEN_EXPIRES! }).toFormat('yyyy-LL-qq TT')
-        //         auth.refresh_token_expires = DateTime.now().plus({ seconds: REFRESH_TOKEN_EXPIRES! }).toFormat('yyyy-LL-qq TT')
+                const auth = <User>validated
+                auth.grant_type = grant_type
+                auth.access_token_expires = DateTime.now().plus({ seconds: ACCESS_TOKEN_EXPIRES! }).toFormat('yyyy-LL-qq TT')
+                auth.refresh_token_expires = DateTime.now().plus({ seconds: REFRESH_TOKEN_EXPIRES! }).toFormat('yyyy-LL-qq TT')
                 
-        //         return await this.passport.generatePassportToken(auth)
-        //     }
-        //     case 'client_credentials': {
-        //         //
-        //         break
-        //     }
-        //     case 'refresh_token': {
-        //         console.log(request.user)
-        //         break
-        //     }
-        // }
+                token = await this.passport.generatePasswordToken(auth)
+                break
+            }
+            case 'client_credentials': {
+                const { client_id, client_secret } = request.body
+                const validated = this.repository.validateClientCredentials(client_id, client_secret)
 
-        const validated = await this.repository.validateUser(username, password)
+                if (!validated) throw new HttpException(401, 'Invalid Client Credentials.')
 
-        if (!validated) throw new HttpException(401, 'Invalid Account.')
+                const auth = <User>validated
+                auth.grant_type = grant_type
+                auth.access_token_expires = DateTime.now().plus({ seconds: ACCESS_TOKEN_EXPIRES! }).toFormat('yyyy-LL-qq TT')
+                auth.refresh_token_expires = DateTime.now().plus({ seconds: REFRESH_TOKEN_EXPIRES! }).toFormat('yyyy-LL-qq TT')
 
-        const auth: User = <User>validated
-        auth.grant_type = grant_type
-        auth.access_token_expires = DateTime.now().plus({ seconds: ACCESS_TOKEN_EXPIRES! }).toFormat('yyyy-LL-qq TT')
-        auth.refresh_token_expires = DateTime.now().plus({ seconds: REFRESH_TOKEN_EXPIRES! }).toFormat('yyyy-LL-qq TT')
-        
-        return await this.passport.generatePassportToken(auth)
+                token = await this.passport.generateClientToken(auth)
+                break
+            }
+        }
 
-        // return await this.passport.generatePassportToken(auth)
+        return {
+            encrypted_token: this.crypt.encrypt(JSON.stringify(token)),
+            token: <Token>token
+        }
     }
 
-    public async refreshToken (request: Request): Promise<Token>
+    public async refreshToken (request: Request): Promise<EncryptedToken>
     {
         const auth = <User>request.user
 
-        const { refresh_token_expires } = auth
+        const { refresh_token_expires, grant_type } = auth
+        let token: Token|undefined
 
         auth.access_token_expires = DateTime.now().plus({ seconds: ACCESS_TOKEN_EXPIRES! }).toFormat('yyyy-LL-qq TT')
         auth.refresh_token_expires = refresh_token_expires
-        
-        return await this.passport.generatePassportToken(auth)
-    }
 
+        switch (grant_type) {
+            case 'password': {
+                token = await this.passport.generatePasswordToken(auth)
+                break
+            }
+            case 'client_credentials': {
+                token = await this.passport.generateClientToken(auth)
+                break
+            }
+        }
+
+        return {
+            encrypted_token: this.crypt.encrypt(JSON.stringify(token)),
+            token: <Token>token
+        }
+    }
 }
 
 export default AuthService

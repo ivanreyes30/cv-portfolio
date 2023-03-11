@@ -6,6 +6,7 @@ import LoginRequest from '@/requests/auth/LoginRequest'
 import TokenRequest from '@/requests/auth/TokenRequest'
 import RefreshTokenRequest from '@/requests/auth/RefreshTokenRequest'
 import PasswordGrantMiddleware from '@/middlewares/PasswordGrantMiddleware'
+import ClientCredentialsMiddleware from '@/middlewares/ClientCredentialsMiddleware'
 import RefreshTokenMiddleware from '@/middlewares/RefreshTokenMiddleware'
 
 class AuthRoute implements RouteInterface
@@ -30,9 +31,11 @@ class AuthRoute implements RouteInterface
         } = AUTH_ROUTE
 
         this.router.get('/', [PasswordGrantMiddleware], this.authController.index.bind(this.authController))
+        this.router.get('/test-client', [ClientCredentialsMiddleware], this.authController.index.bind(this.authController))
         this.router.post(login, LoginRequest, this.authController.login.bind(this.authController))
+        
         this.router.post(token, TokenRequest, this.authController.token.bind(this.authController))
-        this.router.post(refreshToken, [RefreshTokenMiddleware, RefreshTokenRequest], this.authController.refreshToken.bind(this.authController))
+        this.router.post(refreshToken, [RefreshTokenRequest, RefreshTokenMiddleware], this.authController.refreshToken.bind(this.authController))
     }
 }
 

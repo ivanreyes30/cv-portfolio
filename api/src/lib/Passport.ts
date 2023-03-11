@@ -3,7 +3,12 @@ import { Request } from 'express'
 import { DateTime } from 'luxon'
 import { Token, User } from '@/interfaces/AuthInterface'
 import { Strategy as CustomStrategy, VerifiedCallback } from 'passport-custom'
-import { ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET } from '@/config'
+import {
+	ACCESS_TOKEN_SECRET,
+	REFRESH_TOKEN_SECRET,
+	CLIENT_ACCESS_TOKEN_SECRET,
+	CLIENT_REFRESH_TOKEN_SECRET
+} from '@/config'
 import { ACCESS_TOKEN_EXPIRES, REFRESH_TOKEN_EXPIRES } from '@/config/cache'
 import { AUTH_ROUTE } from '@/config/endpoints'
 import { AxiosResponse } from 'axios'
@@ -27,25 +32,42 @@ class Passport implements PassportInterface
     {
 		passport.use('refresh_token', new CustomStrategy(async (request: Request, done: VerifiedCallback) => {
 
+			const { refresh_token, grant_type } = request.body
+			
+			let decoded: { data: User}|undefined
+
+			try {
+				switch (grant_type) {
+					case 'password': {
+						decoded = <{ data: User }>await verify(refresh_token, REFRESH_TOKEN_SECRET!)
+						break
+					}
+					case 'client_credentials': {
+						decoded = <{ data: User }>await verify(refresh_token, CLIENT_REFRESH_TOKEN_SECRET!)
+						break
+					}
+				}
+				decoded = <{ data: User }>decoded
+				const { user_id } = decoded.data
+				const cachedRefreshToken = await this.cache.hget(`refresh_token:${user_id}`, `user_id:${user_id}`)
+
+				if (!cachedRefreshToken) return done('Unauthorized.', false)
+				request.user = decoded.data
+				return done(null, decoded.data)
+
+			} catch (error) {
+				if (error instanceof TokenExpiredError) return done('Token Expired.', false)
+				if (error instanceof JsonWebTokenError) return done('Invalid Token.', false)
+				if (error) return done('Unauthorized.', false)
+			}	
+		}))
+
+		passport.use('refresh_token_client', new CustomStrategy(async (request: Request, done: VerifiedCallback) => {
+
 			const { refresh_token } = request.body
 
-			// verify(refresh_token, REFRESH_TOKEN_SECRET!, async (error: any, decoded: any) => {
-
-				// if (error instanceof TokenExpiredError) return done('Token Expired.', false)
-				// if (error instanceof JsonWebTokenError) return done('Invalid Token.', false)
-				// if (error) return done('Unauthorized.', false)
-
-			// 	const { user_id } = decoded.data
-			// 	const cachedRefreshToken = await this.cache.hget(`refresh_token:${user_id}`, `user_id:${user_id}`)
-
-			// 	if (!cachedRefreshToken) return done('Unauthorized.', false)
-
-			// 	request.user = decoded.data
-			// 	return done(null, decoded.data)
-				
-			// })
 			try {
-				const decoded = <{ data: User }>await verify(refresh_token, REFRESH_TOKEN_SECRET!)
+				const decoded = <{ data: User }>await verify(refresh_token, CLIENT_REFRESH_TOKEN_SECRET!)
 				const { user_id } = decoded.data
 				const cachedRefreshToken = await this.cache.hget(`refresh_token:${user_id}`, `user_id:${user_id}`)
 
@@ -66,33 +88,7 @@ class Passport implements PassportInterface
 			const { _token } = request.cookies
 			if (!_token) return done('Unauthorized.', false)
 
-			// let decryptedToken: string|boolean|Token = this.crypt.decrypt(_token)
-			// if (!decryptedToken) return done('Unauthorized.', false)
-
-			// decryptedToken = JSON.parse(<string>decryptedToken)
-			// const { access_token, refresh_token } = <Token>decryptedToken
-
-			// verify(access_token, ACCESS_TOKEN_SECRET!, async (error: any, decoded: any) => {
-
-			// 	if (error) {
-			// 		const newToken = <AxiosResponse>await this.getNewToken(<string>refresh_token)
-
-			// 		if (!newToken) return done('Unauthorized.', false)
-
-			// 		const { data } = newToken
-
-			// 		const user = await this.verifyAccessToken(data.access_token)
-
-			// 		request.cookies._new_token = this.crypt.encrypt(JSON.stringify(newToken.data))
-			// 		request.user = user
-			// 		return done(null, user)
-			// 	}
-
-			// 	request.user = decoded.data
-			// 	return done(null, decoded.data)
-
-			// })
-
+			request.headers.authorization = `Bearer ${_token}`
 			let decryptedToken: string|boolean|Token = this.crypt.decrypt(_token)
 			if (!decryptedToken) return done('Unauthorized.', false)
 
@@ -105,13 +101,48 @@ class Passport implements PassportInterface
 				request.user = decoded.data
 
 				return done(null, decoded.data)
-			} catch (error) {
-				const newToken = <AxiosResponse>await this.getNewToken(<string>refresh_token)
+			} catch (error: any) {
+				if (error.message === 'invalid signature') return done('Unauthorized.', false)
+				
+				const newToken = <AxiosResponse>await this.getNewToken(<string>refresh_token, 'password')
 
 				if (!newToken) return done('Unauthorized.', false)
 
 				const { data } = newToken
-				const user = await this.verifyAccessToken(data.access_token)
+				const user = await this.verifyPasswordAccessToken(data.access_token)
+
+				request.cookies._new_token = this.crypt.encrypt(JSON.stringify(newToken.data))
+				request.user = user
+				return done(null, user)
+			}
+		}))
+
+		passport.use('client_credentials', new CustomStrategy(async (request: Request, done: VerifiedCallback) => {
+			const { _token } = request.cookies
+			if (!_token) return done('Unauthorized.', false)
+
+			request.headers.authorization = `Bearer ${_token}`
+			let decryptedToken: string|boolean|Token = this.crypt.decrypt(_token)
+			if (!decryptedToken) return done('Unauthorized.', false)
+
+			decryptedToken = JSON.parse(<string>decryptedToken)
+			const { access_token, refresh_token } = <Token>decryptedToken
+
+			try {
+				const decoded = <{ data: User }>verify(access_token, CLIENT_ACCESS_TOKEN_SECRET!)
+
+				request.user = decoded.data
+
+				return done(null, decoded.data)
+			} catch (error: any) {
+				if (error.message === 'invalid signature') return done('Unauthorized.', false)
+
+				const newToken = <AxiosResponse>await this.getNewToken(<string>refresh_token, 'client_credentials')
+
+				if (!newToken) return done('Unauthorized.', false)
+
+				const { data } = newToken
+				const user = await this.verifyClientAccessToken(data.access_token)
 
 				request.cookies._new_token = this.crypt.encrypt(JSON.stringify(newToken.data))
 				request.user = user
@@ -120,7 +151,12 @@ class Passport implements PassportInterface
 		}))
     }
 
-    public generateAccessToken (data: User): string
+	/**
+	 * Password Grant Functions
+	 * 
+	 */
+
+    public generatePasswordAccessToken (data: User): string
     {
 		const { user_id } = data
 
@@ -133,7 +169,7 @@ class Passport implements PassportInterface
 		return accessToken
     }
 
-	public async generateRefreshToken (data: User): Promise<string>
+	public async generatePasswordRefreshToken (data: User): Promise<string>
     {
 		const { user_id } = data
 
@@ -145,7 +181,7 @@ class Passport implements PassportInterface
 			}, REFRESH_TOKEN_SECRET!, { expiresIn: REFRESH_TOKEN_EXPIRES })
 			this.cache.hset(`refresh_token:${user_id}`, `user_id:${user_id}`, refreshToken, REFRESH_TOKEN_EXPIRES)
 		} else {
-			const { refresh_token_expires } = await this.verifyRefreshToken(refreshToken)
+			const { refresh_token_expires } = await this.verifyPasswordRefreshToken(refreshToken)
 			const leftRefreshTokenExpiration = this.getLeftTimeTokenExpirationSeconds(refresh_token_expires)
 			this.cache.hset(`refresh_token:${user_id}`, `user_id:${user_id}`, refreshToken, leftRefreshTokenExpiration)
 		}
@@ -153,18 +189,18 @@ class Passport implements PassportInterface
 		return refreshToken
     }
 
-	public async generatePassportToken (auth: User): Promise<Token>
+	public async generatePasswordToken (auth: User): Promise<Token>
 	{
 		const token = {
-			access_token: this.generateAccessToken(auth),
-			refresh_token: await this.generateRefreshToken(auth),
+			access_token: this.generatePasswordAccessToken(auth),
+			refresh_token: await this.generatePasswordRefreshToken(auth),
 			expires_in: REFRESH_TOKEN_EXPIRES
 		}
 
 		return token
 	}
 
-	public async verifyAccessToken (token: string): Promise<User>
+	public async verifyPasswordAccessToken (token: string): Promise<User>
 	{
 		try {
 			const decoded = <{ data: User }>await verify(token, ACCESS_TOKEN_SECRET!)
@@ -174,10 +210,91 @@ class Passport implements PassportInterface
 		}
 	}
 
-	public async verifyRefreshToken (token: string): Promise<User>
+	public async verifyPasswordRefreshToken (token: string): Promise<User>
 	{
 		try {
 			const decoded = <{ data: User }>await verify(token, REFRESH_TOKEN_SECRET!)
+			return decoded.data
+		} catch (error) {
+			throw new HttpException(401, 'Unauthorized.')
+		}
+	}
+
+	private async getNewToken (token: string, type: string): Promise<AxiosResponse|boolean>
+	{
+		try {
+			const { baseUrl, refreshToken } = AUTH_ROUTE
+			const payload = { refresh_token: token, grant_type: type }
+
+			return await this.httpRequest.post(`${baseUrl}${refreshToken}`, payload)
+		} catch (error) {
+			return false
+		}
+	}
+
+	/**
+	 * Client Credentials Grant Functions
+	 * 
+	 */
+
+	public generateClientAccessToken (data: User): string
+    {
+		const { user_id } = data
+
+		const accessToken = sign({
+			data
+		}, CLIENT_ACCESS_TOKEN_SECRET!, { expiresIn: ACCESS_TOKEN_EXPIRES })
+
+		this.cache.hset(`access_token:${user_id}`, `user_id:${user_id}`, accessToken, ACCESS_TOKEN_EXPIRES)
+
+		return accessToken
+    }
+
+	public async generateClientRefreshToken (data: User): Promise<string>
+    {
+		const { user_id } = data
+
+		let refreshToken = await this.cache.hget(`refresh_token:${user_id}`, `user_id:${user_id}`)
+
+		if (!refreshToken) {
+			refreshToken = sign({
+				data
+			}, CLIENT_REFRESH_TOKEN_SECRET!, { expiresIn: REFRESH_TOKEN_EXPIRES })
+			this.cache.hset(`refresh_token:${user_id}`, `user_id:${user_id}`, refreshToken, REFRESH_TOKEN_EXPIRES)
+		} else {
+			const { refresh_token_expires } = await this.verifyClientRefreshToken(refreshToken)
+			const leftRefreshTokenExpiration = this.getLeftTimeTokenExpirationSeconds(refresh_token_expires)
+			this.cache.hset(`refresh_token:${user_id}`, `user_id:${user_id}`, refreshToken, leftRefreshTokenExpiration)
+		}
+
+		return refreshToken
+    }
+
+	public async generateClientToken (auth: User): Promise<Token>
+	{
+		const token = {
+			access_token: this.generateClientAccessToken(auth),
+			refresh_token: await this.generateClientRefreshToken(auth),
+			expires_in: REFRESH_TOKEN_EXPIRES
+		}
+
+		return token
+	}
+
+	public async verifyClientAccessToken (token: string): Promise<User>
+	{
+		try {
+			const decoded = <{ data: User }>await verify(token, CLIENT_ACCESS_TOKEN_SECRET!)
+			return decoded.data
+		} catch (error) {
+			throw new HttpException(401, 'Unauthorized.')
+		}
+	}
+
+	public async verifyClientRefreshToken (token: string): Promise<User>
+	{
+		try {
+			const decoded = <{ data: User }>await verify(token, CLIENT_REFRESH_TOKEN_SECRET!)
 			return decoded.data
 		} catch (error) {
 			throw new HttpException(401, 'Unauthorized.')
@@ -192,18 +309,6 @@ class Passport implements PassportInterface
 		const leftRefreshTokenExpiration = end.diff(start).as('seconds')
 
 		return leftRefreshTokenExpiration
-	}
-
-	private async getNewToken (token: string): Promise<AxiosResponse|boolean>
-	{
-		try {
-			const { baseUrl, refreshToken } = AUTH_ROUTE
-			const payload = { refresh_token: token }
-
-			return await this.httpRequest.post(`${baseUrl}${refreshToken}`, payload)
-		} catch (error) {
-			return false
-		}
 	}
 }
 
