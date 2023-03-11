@@ -5,12 +5,12 @@ export default interface PassportInterface {
     generatePasswordAccessToken (data: User): string,
     generatePasswordRefreshToken (data: User): Promise<string>,
     generatePasswordToken (auth: User): Promise<Token>,
-    verifyPasswordAccessToken (token: string): Promise<User>,
-    verifyPasswordRefreshToken (token: string): Promise<User>,
+    verifyPasswordAccessToken (token: string): Promise<User|boolean>,
+    verifyPasswordRefreshToken (token: string): Promise<User|boolean>,
     generateClientAccessToken (data: User): string,
     generateClientRefreshToken (data: User): Promise<string>,
     generateClientToken (auth: User): Promise<Token>,
-    verifyClientAccessToken (token: string): Promise<User>,
-    verifyClientRefreshToken (token: string): Promise<User>,
+    verifyClientAccessToken (token: string): Promise<User|boolean>,
+    verifyClientRefreshToken (token: string): Promise<User|boolean>,
     getLeftTimeTokenExpirationSeconds (datetime: string): number
 }

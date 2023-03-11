@@ -16,7 +16,6 @@ import Crypt from '@/lib/Crypt'
 import Redis from '@/lib/Redis'
 import passport from 'passport'
 import HttpRequest from '@/core/HttpRequest'
-import HttpException from '@/core/HttpException'
 
 import PassportInterface from '@/interfaces/PassportInterface'
 
@@ -62,27 +61,6 @@ class Passport implements PassportInterface
 			}	
 		}))
 
-		passport.use('refresh_token_client', new CustomStrategy(async (request: Request, done: VerifiedCallback) => {
-
-			const { refresh_token } = request.body
-
-			try {
-				const decoded = <{ data: User }>await verify(refresh_token, CLIENT_REFRESH_TOKEN_SECRET!)
-				const { user_id } = decoded.data
-				const cachedRefreshToken = await this.cache.hget(`refresh_token:${user_id}`, `user_id:${user_id}`)
-
-				if (!cachedRefreshToken) return done('Unauthorized.', false)
-				request.user = decoded.data
-
-				return done(null, decoded.data)
-			} catch (error) {
-				if (error instanceof TokenExpiredError) return done('Token Expired.', false)
-				if (error instanceof JsonWebTokenError) return done('Invalid Token.', false)
-				if (error) return done('Unauthorized.', false)
-			}
-			
-		}))
-
 		passport.use('password_grant', new CustomStrategy(async (request: Request, done: VerifiedCallback) => {
 			
 			const { _token } = request.cookies
@@ -96,7 +74,11 @@ class Passport implements PassportInterface
 			const { access_token, refresh_token } = <Token>decryptedToken
 
 			try {
-				const decoded = <{ data: User }>verify(access_token, ACCESS_TOKEN_SECRET!)
+				const checkIfTokenRevoked = await this.verifyPasswordRefreshToken(<string>refresh_token)
+
+				if (!checkIfTokenRevoked) return done('Unauthorized.', false)
+
+				const decoded = <{ data: User }>await verify(access_token, ACCESS_TOKEN_SECRET!)
 
 				request.user = decoded.data
 
@@ -129,7 +111,11 @@ class Passport implements PassportInterface
 			const { access_token, refresh_token } = <Token>decryptedToken
 
 			try {
-				const decoded = <{ data: User }>verify(access_token, CLIENT_ACCESS_TOKEN_SECRET!)
+				const checkIfTokenRevoked = await this.verifyClientAccessToken(<string>refresh_token)
+
+				if (!checkIfTokenRevoked) return done('Unauthorized.', false)
+				
+				const decoded = <{ data: User }>await verify(access_token, CLIENT_ACCESS_TOKEN_SECRET!)
 
 				request.user = decoded.data
 
@@ -181,7 +167,7 @@ class Passport implements PassportInterface
 			}, REFRESH_TOKEN_SECRET!, { expiresIn: REFRESH_TOKEN_EXPIRES })
 			this.cache.hset(`refresh_token:${user_id}`, `user_id:${user_id}`, refreshToken, REFRESH_TOKEN_EXPIRES)
 		} else {
-			const { refresh_token_expires } = await this.verifyPasswordRefreshToken(refreshToken)
+			const { refresh_token_expires } = <User>await this.verifyPasswordRefreshToken(refreshToken)
 			const leftRefreshTokenExpiration = this.getLeftTimeTokenExpirationSeconds(refresh_token_expires)
 			this.cache.hset(`refresh_token:${user_id}`, `user_id:${user_id}`, refreshToken, leftRefreshTokenExpiration)
 		}
@@ -200,23 +186,31 @@ class Passport implements PassportInterface
 		return token
 	}
 
-	public async verifyPasswordAccessToken (token: string): Promise<User>
+	public async verifyPasswordAccessToken (token: string): Promise<User|boolean>
 	{
 		try {
 			const decoded = <{ data: User }>await verify(token, ACCESS_TOKEN_SECRET!)
 			return decoded.data
 		} catch (error) {
-			throw new HttpException(401, 'Unauthorized.')
+			return false
 		}
 	}
 
-	public async verifyPasswordRefreshToken (token: string): Promise<User>
+	public async verifyPasswordRefreshToken (token: string): Promise<User|boolean>
 	{
 		try {
 			const decoded = <{ data: User }>await verify(token, REFRESH_TOKEN_SECRET!)
+			
+			const { user_id } = decoded.data
+
+			const cachedRefreshToken = await this.cache.hget(`refresh_token:${user_id}`, `user_id:${user_id}`)
+
+			if (!cachedRefreshToken) return false
+
 			return decoded.data
+
 		} catch (error) {
-			throw new HttpException(401, 'Unauthorized.')
+			return false
 		}
 	}
 
@@ -262,7 +256,7 @@ class Passport implements PassportInterface
 			}, CLIENT_REFRESH_TOKEN_SECRET!, { expiresIn: REFRESH_TOKEN_EXPIRES })
 			this.cache.hset(`refresh_token:${user_id}`, `user_id:${user_id}`, refreshToken, REFRESH_TOKEN_EXPIRES)
 		} else {
-			const { refresh_token_expires } = await this.verifyClientRefreshToken(refreshToken)
+			const { refresh_token_expires } = <User>await this.verifyClientRefreshToken(refreshToken)
 			const leftRefreshTokenExpiration = this.getLeftTimeTokenExpirationSeconds(refresh_token_expires)
 			this.cache.hset(`refresh_token:${user_id}`, `user_id:${user_id}`, refreshToken, leftRefreshTokenExpiration)
 		}
@@ -281,23 +275,31 @@ class Passport implements PassportInterface
 		return token
 	}
 
-	public async verifyClientAccessToken (token: string): Promise<User>
+	public async verifyClientAccessToken (token: string): Promise<User|boolean>
 	{
 		try {
 			const decoded = <{ data: User }>await verify(token, CLIENT_ACCESS_TOKEN_SECRET!)
 			return decoded.data
 		} catch (error) {
-			throw new HttpException(401, 'Unauthorized.')
+			return false
 		}
 	}
 
-	public async verifyClientRefreshToken (token: string): Promise<User>
+	public async verifyClientRefreshToken (token: string): Promise<User|boolean>
 	{
 		try {
 			const decoded = <{ data: User }>await verify(token, CLIENT_REFRESH_TOKEN_SECRET!)
+			
+			const { user_id } = decoded.data
+			
+			const cachedRefreshToken = await this.cache.hget(`refresh_token:${user_id}`, `user_id:${user_id}`)
+		
+			if (!cachedRefreshToken) return false
+
 			return decoded.data
+
 		} catch (error) {
-			throw new HttpException(401, 'Unauthorized.')
+			return false
 		}
 	}
 
